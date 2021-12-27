@@ -124,6 +124,21 @@ def _convert_conv_transpose(net, node, graph, err):
     if bias_flag:
         np.copyto(net.params[node_name][1].data, bias, casting='same_kind')
 
+def _convert_conv_slice(net, node, graph, err):
+    pass
+
+def _convert_resize(net, node, graph, err):
+    mode = node.attrs["mode"]
+    node_name = node.name
+    if mode == "nearest":
+        caffe_params = net.params[node_name][0].data
+        weights = np.ones(caffe_params.shape).astype("float32")
+        np.copyto(net.params[node_name][0].data, weights, casting='same_kind')
+        # net.params[node_name][0].data[]
+
+def _convert_Permute(net, node, graph, err):
+    pass
+
 _ONNX_NODE_REGISTRY = {
     "Conv": _convert_conv,
     "Relu": _convert_relu,
@@ -140,6 +155,9 @@ _ONNX_NODE_REGISTRY = {
     "ConvTranspose": _convert_conv_transpose,
     "Sigmoid": _convert_sigmoid,
     "Flatten": _convert_Flatten,
+    "Slice": _convert_conv_slice,
+    "Resize": _convert_resize,
+    "Transpose": _convert_Permute,
 }
 
 

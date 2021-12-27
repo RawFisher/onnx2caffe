@@ -186,7 +186,7 @@ def _convert_Reshape(node,graph,err):
         layer = myf("Flatten",node_name,[input_name],[output_name],in_place=inplace)
         graph.channel_dims[output_name] = shape[1]
         return layer
-    elif len(shape) == 4:
+    elif len(shape) == 4 or len(shape) == 3 or len(shape) == 5:
         graph.channel_dims[output_name] = shape[1]
         layer = myf("Reshape", node_name, [input_name], [output_name], reshape_param = dict(shape=dict(dim=list(shape))))
         return layer
@@ -379,7 +379,43 @@ def _convert_conv_transpose(node,graph,err):
     #         group=groups,
     #         bias_term=bias_term))
 
+def _convert_resize(node, graph, err):
+    node_name = node.name
+    input_name = str(node.inputs[0])
+    output_name = str(node.outputs[0])
+    mode = node.attrs["mode"]
+    # https://github.com/jnulzl/caffe_plus 里面的upsample 是用的nearest插值
+    if str(mode,encoding="gbk") == "nearest":
+        scales = node.input_tensors.get(node.inputs[2])
+        height_scale = scales[2]
+        width_scale = scales[3]
+        if (height_scale == width_scale):
+            layer = myf("Upsample", node_name, [input_name], [output_name],
+                        upsample_param=dict(
+                            scale = int(height_scale),
+                        ))
+        else:
+            return err.unsupported_op_configuration(node, "Resize is supported only height_scale == width_scale")
+    else:
+        return err.unsupported_op_configuration(node, "Resize is supported only nearest mode")
 
+    graph.channel_dims[output_name] = graph.channel_dims[input_name]
+    return layer
+
+def _convert_Permute(node, graph, err):
+    node_name = node.name
+    input_name = str(node.inputs[0])
+    output_name = str(node.outputs[0])
+    if len(node.inputs) == 1:
+        shape = tuple(node.attrs.get('perm', ()))
+    else:
+        shape = tuple(node.input_tensors[node.inputs[1]])
+
+    if len(shape) == 3 or len(shape) == 4 or len(shape) == 5:
+        layer = myf("Permute", node_name, [input_name], [output_name], permute_param=dict(order=list(shape)))
+        return layer
+    else:
+        return err.unsupported_op_configuration(node, "permute dimention number shall be 2 or 4")
 
 _ONNX_NODE_REGISTRY = {
     "Conv": _convert_conv,
@@ -397,4 +433,6 @@ _ONNX_NODE_REGISTRY = {
     "ConvTranspose": _convert_conv_transpose,
     "Sigmoid": _convert_sigmoid,
     "Flatten": _convert_Flatten,
+    "Resize":_convert_resize,
+    "Transpose": _convert_Permute,
 }
